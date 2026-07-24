@@ -1,8 +1,9 @@
 // Membership Level Enumeration
 //
-// Canonical user-level structure (1 customer + 5 professional + 2 admin):
+// Canonical 5-tier professional ladder (client-confirmed naming/order) + 1
+// customer role + 2 admin tiers:
 //   • Tax Client            — role 'client' (not a membershipLevel)
-//   • Free Directory Listing — $0      (DIRECTORY_LISTING)
+//   • Free Listing           — $0      (DIRECTORY_LISTING)
 //   • Associate Partner      — $99.95  (ACQUISITION)
 //   • Professional Partner   — $299.95 (PROFESSIONAL_PACKAGE)
 //   • Premier Partner        — $499.95 (PREMIUM_PARTNER)
@@ -12,13 +13,13 @@
 // ⚠️ BACK-COMPAT: the string VALUES below are what new accounts store in
 // users/{uid}.membershipLevel. Several of them were renamed (e.g. "Associate
 // (Entry Level)" → "Associate Partner", "Professional" → "Professional
-// Partner", "Directory Listing" → "Free Directory Listing"). Existing user docs
-// still hold the OLD strings, so every comparison goes through getTierRank(),
-// and MEMBERSHIP_TIER_RANK lists the legacy strings as aliases. The
-// firestore.rules member_content read rule lists the same literal strings (new
-// + legacy) so DB-level content gating stays in sync.
+// Partner", "Directory Listing" / "Free Directory Listing" → "Free Listing").
+// Existing user docs still hold the OLD strings, so every comparison goes
+// through getTierRank(), and MEMBERSHIP_TIER_RANK lists the legacy strings as
+// aliases. The firestore.rules member_content read rule lists the same
+// literal strings (new + legacy) so DB-level content gating stays in sync.
 export enum MembershipLevel {
-  DIRECTORY_LISTING = "Free Directory Listing",
+  DIRECTORY_LISTING = "Free Listing",
   ACQUISITION = "Associate Partner",
   PROFESSIONAL_PACKAGE = "Professional Partner",
 
@@ -78,8 +79,9 @@ export const PUBLIC_MEMBERSHIP_LEVELS = [
 // Listing rank (0) for anything unknown.
 // ─────────────────────────────────────────────────────────────────────────────
 export const MEMBERSHIP_TIER_RANK: Record<string, number> = {
-  // Free directory listing (and legacy aliases) — the entry point.
-  [MembershipLevel.DIRECTORY_LISTING]: 0, // "Free Directory Listing"
+  // Free listing (and legacy aliases) — the entry point.
+  [MembershipLevel.DIRECTORY_LISTING]: 0, // "Free Listing"
+  'Free Directory Listing': 0,            // previous canonical value
   'Directory Listing': 0,                 // legacy enum value
   'Listing': 0,
   'Free': 0,

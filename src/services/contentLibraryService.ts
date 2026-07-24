@@ -36,8 +36,23 @@ import type { ContentCategory } from '@/constants/contentCategories';
 export const MEMBER_CONTENT_COLLECTION = 'member_content';
 const STORAGE_PREFIX = 'member-content';
 
-/** Where the asset lives: an uploaded file, an external link, or a video URL. */
-export type ContentType = 'file' | 'link' | 'video';
+/**
+ * Where the asset lives: an uploaded file, an external link, a video URL, or a
+ * folder (multiple uploaded files shared as one unit). Folders reuse the exact
+ * same `member-content/{id}/{filename}` Storage path as a single file — they
+ * just upload more than one object under the same content id — so no Storage
+ * rule changes are required beyond what already permits the single-file case.
+ */
+export type ContentType = 'file' | 'link' | 'video' | 'folder';
+
+/** One file inside a 'folder' content item. */
+export interface MemberContentFile {
+  name: string;
+  url: string;
+  storage_path: string;
+  size: number;
+  content_type: string;
+}
 
 export interface MemberContent {
   id: string;
@@ -46,13 +61,15 @@ export interface MemberContent {
   /** Audience categories this content is assigned to (one or more). */
   categories: ContentCategory[];
   type: ContentType;
-  /** Download URL (file) or external/embed URL (link / video). */
+  /** Download URL (file) or external/embed URL (link / video). Unused for 'folder'. */
   url: string;
   /** Storage path — set only when type==='file' so we can delete the object. */
   storage_path?: string | null;
   file_name?: string | null;
   file_size?: number | null;
   content_type?: string | null;
+  /** Set only when type==='folder' — the files shared as this one unit. */
+  files?: MemberContentFile[] | null;
   is_published: boolean;
   created_by?: string | null;
   created_at?: string;
@@ -64,10 +81,12 @@ export interface CreateContentInput {
   description?: string;
   categories: ContentCategory[];
   type: ContentType;
-  /** Required for type 'link' / 'video'. Ignored for 'file' (the upload sets it). */
+  /** Required for type 'link' / 'video'. Ignored for 'file'/'folder' (the upload sets it). */
   url?: string;
   /** Required for type 'file'. */
   file?: File | null;
+  /** Required for type 'folder' — every file uploaded together as one shareable unit. */
+  files?: File[] | null;
   is_published?: boolean;
   created_by?: string | null;
 }
@@ -97,6 +116,7 @@ const normalize = (id: string, raw: any): MemberContent => ({
   file_name: raw.file_name ?? null,
   file_size: typeof raw.file_size === 'number' ? raw.file_size : null,
   content_type: raw.content_type ?? null,
+  files: Array.isArray(raw.files) ? (raw.files as MemberContentFile[]) : null,
   is_published: raw.is_published !== false,
   created_by: raw.created_by ?? null,
   created_at: tsToIso(raw.created_at),
@@ -168,7 +188,10 @@ const sanitizeFilename = (name: string): string =>
 /**
  * Create a content item. For type 'file', uploads to
  * `member-content/{id}/{filename}` first and stores the download URL + storage
- * path. For 'link'/'video', persists the supplied `url`.
+ * path. For type 'folder', uploads every file in `input.files` to that same
+ * `member-content/{id}/` prefix and stores them all in the `files[]` array —
+ * one Firestore doc represents the whole shared folder. For 'link'/'video',
+ * persists the supplied `url`.
  */
 export const createContent = async (input: CreateContentInput): Promise<MemberContent> => {
   if (!db) throw new Error('Firestore is not initialized');
@@ -185,6 +208,7 @@ export const createContent = async (input: CreateContentInput): Promise<MemberCo
   let file_name: string | null = null;
   let file_size: number | null = null;
   let content_type: string | null = null;
+  let files: MemberContentFile[] | null = null;
 
   if (input.type === 'file') {
     if (!input.file) throw new Error('Select a file to upload.');
@@ -195,6 +219,24 @@ export const createContent = async (input: CreateContentInput): Promise<MemberCo
     file_name = input.file.name;
     file_size = input.file.size;
     content_type = input.file.type || 'application/octet-stream';
+  } else if (input.type === 'folder') {
+    if (!input.files || input.files.length === 0) {
+      throw new Error('Select at least one file to upload for this folder.');
+    }
+    // Sequential (not Promise.all) so a mid-batch failure reports cleanly and
+    // large folders don't fire dozens of concurrent uploads at once.
+    files = [];
+    for (const f of input.files) {
+      const path = `${STORAGE_PREFIX}/${ref.id}/${Date.now()}_${sanitizeFilename(f.name)}`;
+      const uploaded = await uploadFile(f, path);
+      files.push({
+        name: f.name,
+        url: uploaded.url,
+        storage_path: uploaded.path,
+        size: f.size,
+        content_type: f.type || 'application/octet-stream',
+      });
+    }
   } else {
     if (!url) throw new Error('Enter a URL for this content.');
   }
@@ -209,6 +251,7 @@ export const createContent = async (input: CreateContentInput): Promise<MemberCo
     file_name,
     file_size,
     content_type,
+    files,
     is_published: input.is_published !== false,
     created_by: input.created_by ?? null,
     created_at: serverTimestamp(),
@@ -239,8 +282,9 @@ export const setContentPublished = async (id: string, isPublished: boolean): Pro
   updateContent(id, { is_published: isPublished });
 
 /**
- * Delete a content item. Removes the backing Storage object first (best-effort —
- * a failed Storage delete must not orphan the Firestore record), then the doc.
+ * Delete a content item. Removes the backing Storage object(s) first
+ * (best-effort — a failed Storage delete must not orphan the Firestore
+ * record), then the doc. For a 'folder' item this removes every file in it.
  */
 export const deleteContent = async (content: MemberContent): Promise<void> => {
   if (!db) throw new Error('Firestore is not initialized');
@@ -249,6 +293,15 @@ export const deleteContent = async (content: MemberContent): Promise<void> => {
       await deleteFile(content.storage_path);
     } catch (e) {
       console.warn('[contentLibraryService] storage delete failed (continuing):', (e as Error).message);
+    }
+  }
+  if (content.files && content.files.length > 0) {
+    for (const f of content.files) {
+      try {
+        await deleteFile(f.storage_path);
+      } catch (e) {
+        console.warn('[contentLibraryService] folder file delete failed (continuing):', (e as Error).message);
+      }
     }
   }
   await deleteDoc(doc(db, MEMBER_CONTENT_COLLECTION, content.id));

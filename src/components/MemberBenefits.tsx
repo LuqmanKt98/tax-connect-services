@@ -22,7 +22,7 @@ const MemberBenefits: React.FC = () => {
                 <div className="flex items-start space-x-3">
                   <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
                   <div>
-                    <strong>Free Directory Listing</strong> – Reach clients searching for trusted tax preparers.
+                    <strong>Free Listing</strong> – Reach clients searching for trusted tax preparers.
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">

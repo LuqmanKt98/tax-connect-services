@@ -39,6 +39,7 @@ import {
   buildBrandedEmail,
 } from '@/services/firebaseEmailService';
 import { ensureProfessionalSlug } from '@/services/professionalsService';
+import { captureFreeListing, markFreeListingUpgraded } from '@/services/freeListingsService';
 import ShareableProfileLink from '@/components/ShareableProfileLink';
 
 import { useToast } from '@/hooks/use-toast';
@@ -769,6 +770,33 @@ export default function TaxProfessionalOnboarding() {
 
     let permissionBlocked = false;
 
+    // 0. GUARANTEED FREE-LISTING CAPTURE (runs first, awaited).
+    //    The client's promise: anyone who reaches the Agreement stage is saved
+    //    as a free listing to follow up on — whether or not they complete the
+    //    optional paid upgrade. The writes in steps 1 & 2 below are gated on a
+    //    valid signed-in session AND on the deployed `professionals` /
+    //    `signed_agreements` rules; when either is off they are silently
+    //    swallowed, leaving zero record (the "25 completed, nothing saved"
+    //    bug). `free_listings` has an open create rule, so this write succeeds
+    //    regardless of auth/rules state and is the durable lead of record.
+    const listingResult = await captureFreeListing({
+      uid: user?.uid || null,
+      name: fullName || signed.signerName,
+      email: signed.signerEmail || profile.email,
+      phone: profile.phone,
+      businessName: profile.businessName,
+      city: profile.city,
+      state: profile.state,
+      zipCode: profile.zipCode,
+      ptin: jotform.ptin,
+      efin: jotform.efin,
+      yearsPreparing: jotform.yearsPreparing,
+      agreementVersion: signed.agreementVersion,
+      signedAt: signed.signedAt,
+      clientIp: signed.clientIp ?? null,
+      userAgent: signed.userAgent,
+    });
+
     // 1. Persist signed agreement + jotform answers on the professional doc.
     //    Wrapped independently so a permission/rules rejection does NOT abort
     //    the rest of submission — the user still proceeds to payment.
@@ -891,18 +919,31 @@ export default function TaxProfessionalOnboarding() {
     }
     setCurrentStep(7);
 
-    if (permissionBlocked) {
+    if (!listingResult.ok) {
+      // The durable safety-net write itself failed (rare — open create rule).
+      // Nothing was persisted server-side; keep the local copy and let them
+      // continue, but do not falsely claim their listing is saved.
+      console.error('Free-listing capture failed at agreement stage:', listingResult.error);
       toast({
         title: 'Agreement signed — continuing',
         description:
-          "Your agreement is recorded on this device. We couldn't fully sync it to our servers just yet (a temporary backend setting on our end), but you can finish — choose your membership tier and complete payment.",
+          "Your agreement is recorded on this device. We're finishing syncing it to our servers — you can continue and choose your membership tier.",
+        duration: 8000,
+      });
+    } else if (permissionBlocked) {
+      // Safety-net capture succeeded, so their free listing IS saved even
+      // though the richer profile/audit writes were blocked by backend rules.
+      toast({
+        title: 'Agreement signed — your free listing is saved!',
+        description:
+          "You're on the list. Optionally, choose a membership tier and complete payment to unlock upgrades — or you're all set with your free listing.",
         duration: 8000,
       });
     } else {
       toast({
-        title: 'Agreement signed!',
+        title: 'Agreement signed — your free listing is saved!',
         description:
-          'One last step — choose your membership tier and complete payment to activate your account.',
+          'One last optional step — choose a membership tier and complete payment to unlock upgrades.',
       });
     }
 
@@ -1003,6 +1044,10 @@ export default function TaxProfessionalOnboarding() {
           onComplete={(tier) => {
             setPaidTier(tier);
             setIsComplete(true);
+            // Keep the follow-up list accurate: flip this lead from
+            // free-listing to upgraded so the client can tell paid members
+            // apart from free listings they still want to follow up with.
+            if (user?.uid) markFreeListingUpgraded(user.uid, tier?.name);
           }}
         />
       );

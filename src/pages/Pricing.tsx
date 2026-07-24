@@ -501,7 +501,7 @@ const Pricing: React.FC = () => {
                     <span className="block text-xs font-normal" style={{ color: '#B8860B' }}>VIP</span>
                   </th>
                   <th className="text-center py-4 px-4 font-bold text-emerald-700">
-                    Service Bureau
+                    Service Bureau Partner
                     <span className="block text-xs font-normal text-emerald-600">Enterprise</span>
                   </th>
                 </tr>

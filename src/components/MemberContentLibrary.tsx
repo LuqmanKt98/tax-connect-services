@@ -19,6 +19,7 @@ import {
   Download,
   ExternalLink,
   FolderOpen,
+  Folder,
   Loader2,
   Lock,
 } from 'lucide-react';
@@ -32,7 +33,7 @@ import {
 } from '@/constants/contentCategories';
 
 const typeIconFor = (type: MemberContent['type']) =>
-  type === 'video' ? PlayCircle : type === 'link' ? LinkIcon : FileText;
+  type === 'video' ? PlayCircle : type === 'link' ? LinkIcon : type === 'folder' ? Folder : FileText;
 
 const MemberContentLibrary: React.FC = () => {
   const { user } = useAuth();
@@ -117,6 +118,7 @@ const MemberContentLibrary: React.FC = () => {
             {sectionItems.map((item) => {
               const TypeIcon = typeIconFor(item.type);
               const isFile = item.type === 'file';
+              const isFolder = item.type === 'folder';
               return (
                 <Card key={`${cat}-${item.id}`} className="flex flex-col">
                   <CardContent className="flex flex-1 flex-col p-5">
@@ -125,27 +127,50 @@ const MemberContentLibrary: React.FC = () => {
                     </div>
                     <h3 className="mb-1 font-medium text-gray-900">{item.title}</h3>
                     {item.description && (
-                      <p className="mb-4 line-clamp-3 flex-1 text-sm text-gray-600">
+                      <p className="mb-4 line-clamp-3 text-sm text-gray-600">
                         {item.description}
                       </p>
                     )}
-                    <div className="mt-auto pt-2">
-                      <Button asChild variant="outline" size="sm" className="w-full" disabled={!item.url}>
-                        <a href={item.url} target="_blank" rel="noopener noreferrer">
-                          {isFile ? (
-                            <>
-                              <Download className="mr-2 h-4 w-4" />
-                              Download
-                            </>
-                          ) : (
-                            <>
-                              <ExternalLink className="mr-2 h-4 w-4" />
-                              {item.type === 'video' ? 'Watch' : 'Open'}
-                            </>
-                          )}
-                        </a>
-                      </Button>
-                    </div>
+                    {isFolder ? (
+                      <div className="mt-auto pt-2">
+                        <p className="mb-2 text-xs text-gray-500">
+                          {item.files?.length || 0} file{item.files?.length === 1 ? '' : 's'}
+                        </p>
+                        <ul className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-gray-200 p-2">
+                          {(item.files || []).map((f, i) => (
+                            <li key={`${f.storage_path}-${i}`}>
+                              <a
+                                href={f.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 rounded px-1.5 py-1 text-sm text-blue-700 hover:bg-blue-50 hover:underline"
+                              >
+                                <Download className="h-3.5 w-3.5 flex-shrink-0" />
+                                <span className="truncate">{f.name}</span>
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      <div className="mt-auto pt-2">
+                        <Button asChild variant="outline" size="sm" className="w-full" disabled={!item.url}>
+                          <a href={item.url} target="_blank" rel="noopener noreferrer">
+                            {isFile ? (
+                              <>
+                                <Download className="mr-2 h-4 w-4" />
+                                Download
+                              </>
+                            ) : (
+                              <>
+                                <ExternalLink className="mr-2 h-4 w-4" />
+                                {item.type === 'video' ? 'Watch' : 'Open'}
+                              </>
+                            )}
+                          </a>
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               );

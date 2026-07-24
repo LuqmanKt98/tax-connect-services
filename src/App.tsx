@@ -47,7 +47,7 @@ import About from "./pages/About";
 import OurStory from "./pages/OurStory";
 import JoinPlatform from "./pages/JoinPlatform";
 import Pricing from "./pages/Pricing";
-import ComingSoon from "./pages/ComingSoon";
+import Refer from "./pages/Refer";
 
 import TaxProfessionalOnboarding from "./components/TaxProfessionalOnboarding";
 import AdminPanel from "./pages/AdminPanel";
@@ -56,6 +56,7 @@ import ContactSubmissions from "./pages/ContactSubmissions";
 import EnrollmentSubmissions from "./pages/EnrollmentSubmissions";
 import LandingAnalytics from "./pages/LandingAnalytics";
 import SignedAgreements from "./pages/SignedAgreements";
+import FreeListings from "./pages/FreeListings";
 import EnrollmentFormPreview from "./pages/EnrollmentFormPreview";
 import StripeTest from "./pages/StripeTest";
 import StripeTestCheckout from "./pages/StripeTestCheckout";
@@ -136,9 +137,7 @@ const AppRoutes = () => {
               <Route path="/our-story" element={<OurStory />} />
               <Route path="/join-platform" element={<JoinPlatform />} />
               <Route path="/pricing" element={<Pricing />} />
-              {/* Refer & Earn is linked in the header but not built yet — show a
-                  friendly Coming Soon page instead of falling through to 404. */}
-              <Route path="/refer" element={<ComingSoon />} />
+              <Route path="/refer" element={<Refer />} />
               <Route path="/join" element={<ExternalRedirect url="https://refund-connect.com/join-platform" />} />
               <Route path="/onboarding" element={<TaxProfessionalOnboarding />} />
               {/* Admin console — AdminPanel renders the dark AdminLayout shell;
@@ -162,6 +161,7 @@ const AppRoutes = () => {
               <Route path="/admin/enrollments" element={<EnrollmentSubmissions />} />
               <Route path="/admin/landing-analytics" element={<LandingAnalytics />} />
               <Route path="/admin/signed-agreements" element={<SignedAgreements />} />
+              <Route path="/admin/free-listings" element={<FreeListings />} />
 
 
 

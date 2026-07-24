@@ -8,11 +8,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Search, Filter, Edit, Mail, History, Loader2, Users } from 'lucide-react';
-import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { MembershipLevel, ALL_MEMBERSHIP_LEVELS } from '@/constants/membershipLevels';
+import { MembershipLevel, ALL_MEMBERSHIP_LEVELS, getTierRank, membershipLevelLabel } from '@/constants/membershipLevels';
+import { queueFirebaseEmail, buildBrandedEmail } from '@/services/firebaseEmailService';
 import { toast } from 'sonner';
 
 interface User {
@@ -65,14 +65,19 @@ export function UserMembershipManager() {
     if (!editUser || !newLevel) return;
     try {
       const userRef = doc(db, 'users', editUser.id);
-      await updateDoc(userRef, { membershipLevel: newLevel });
-      
-      await supabase.functions.invoke('update-user-membership', {
-        body: { userId: editUser.id, newLevel, previousLevel: editUser.membershipLevel, adminId: user?.uid, reason }
+      // Persist the change + a lightweight audit trail directly on the user
+      // doc (no separate edge function needed — Firebase is the backend).
+      await updateDoc(userRef, {
+        membershipLevel: newLevel,
+        membershipUpdatedAt: serverTimestamp(),
+        membershipUpdatedBy: user?.uid || null,
+        membershipChangeReason: reason || null,
+        membershipPreviousLevel: editUser.membershipLevel,
       });
 
       toast.success('Membership updated');
       setEditUser(null);
+      setReason('');
       fetchUsers();
     } catch (error) {
       toast.error('Update failed');
@@ -80,9 +85,22 @@ export function UserMembershipManager() {
   };
 
   const sendNotification = async (userId: string, userEmail: string, userName: string) => {
+    if (!userEmail) {
+      toast.error('This user has no email on file');
+      return;
+    }
     try {
-      await supabase.functions.invoke('send-membership-notification', {
-        body: { userEmail, userName, subject: 'Membership Update', message: 'Your membership has been updated.' }
+      const html = buildBrandedEmail({
+        title: 'Your Membership Has Been Updated',
+        intro: `Hi ${userName || 'there'},<br/><br/>Your membership on Refund Connect has been updated. Sign in to your dashboard to see the details.`,
+        accentColor: '#2563eb',
+      });
+      await queueFirebaseEmail({
+        to: userEmail,
+        subject: 'Membership Update — Refund Connect',
+        html,
+        category: 'membership_update',
+        meta: { userId },
       });
       toast.success('Notification sent');
     } catch (error) {
@@ -91,9 +109,14 @@ export function UserMembershipManager() {
   };
 
   const filteredUsers = users.filter(u => {
-    const matchesSearch = u.displayName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const matchesSearch = u.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          u.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTier = tierFilter === 'all' || u.membershipLevel === tierFilter;
+    // Compare by tier RANK, not raw string — stored membershipLevel values are
+    // frequently legacy strings (e.g. "Associate (Entry Level)") that differ
+    // from the canonical dropdown value ("Associate Partner") but mean the
+    // same tier. A strict === here made the filter silently return zero
+    // results for any user still holding a legacy string.
+    const matchesTier = tierFilter === 'all' || getTierRank(u.membershipLevel) === getTierRank(tierFilter);
     return matchesSearch && matchesTier;
   });
 
@@ -134,7 +157,7 @@ export function UserMembershipManager() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <Badge>{u.membershipLevel}</Badge>
+                <Badge>{membershipLevelLabel(u.membershipLevel)}</Badge>
                 <Button size="sm" variant="outline" onClick={() => { setEditUser(u); setNewLevel(u.membershipLevel); }}>
                   <Edit className="h-4 w-4" />
                 </Button>

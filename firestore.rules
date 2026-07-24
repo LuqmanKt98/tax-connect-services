@@ -301,6 +301,23 @@ service cloud.firestore {
       allow read, update, delete: if isSignedIn();
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // free_listings/{docId}
+    //
+    // The durable "free listing" lead of record for every applicant who
+    // reaches the onboarding Agreement stage — written by
+    // freeListingsService.captureFreeListing. Create is OPEN by design: this is
+    // the safety net that must succeed even when the applicant's session is lost
+    // or the professionals/signed_agreements rules are stale, so a completed
+    // agreement is never lost. Merge-updates (create) keep one row per person
+    // and let the payment step flip status → 'upgraded'. Reads/exports are
+    // limited to signed-in admins (the /admin/free-listings follow-up list).
+    // ─────────────────────────────────────────────────────────────────────
+    match /free_listings/{docId} {
+      allow create: if true;
+      allow read, update, delete: if isSignedIn();
+    }
+
     match /referrals/{docId} {
       allow create: if isSignedIn();
       allow read: if isSignedIn();

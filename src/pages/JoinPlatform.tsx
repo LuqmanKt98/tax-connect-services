@@ -213,7 +213,7 @@ const JoinPlatform: React.FC = () => {
               <div onClick={() => handleTierClick('associate')} className="bg-white rounded-2xl shadow-md p-8 transition-transform hover:-translate-y-1 cursor-pointer">
 
                 <div className="text-center mb-4">
-                  <h3 className="text-xl font-bold">Associate</h3>
+                  <h3 className="text-xl font-bold">Associate Partner</h3>
                   <p className="text-gray-600 text-sm">Entry-level — build your tax career</p>
                   <div className="text-3xl font-bold text-gray-900 mt-4">$99.95</div>
 
@@ -245,7 +245,7 @@ const JoinPlatform: React.FC = () => {
                   <div className="bg-blue-600 text-white px-4 py-1 rounded-full text-sm font-semibold shadow">Most Popular</div>
                 </div>
                 <div className="text-center mb-4">
-                  <h3 className="text-xl font-bold">Professional</h3>
+                  <h3 className="text-xl font-bold">Professional Partner</h3>
                   <p className="text-gray-600 text-sm">For experienced preparers ready to grow</p>
                   <div className="text-3xl font-bold text-gray-900 mt-4">$299.95</div>
 
@@ -342,9 +342,9 @@ const JoinPlatform: React.FC = () => {
               <thead>
                 <tr className="border-b-2 border-gray-200">
                   <th className="text-left py-4 px-4 text-gray-700 font-semibold">Feature</th>
-                  <th className="text-center py-4 px-4 text-gray-900 font-bold">Associate</th>
+                  <th className="text-center py-4 px-4 text-gray-900 font-bold">Associate Partner</th>
                   <th className="text-center py-4 px-4 text-blue-600 font-bold">
-                    Professional
+                    Professional Partner
                     <span className="block text-xs text-blue-500 font-normal">Most Popular</span>
                   </th>
                   <th className="text-center py-4 px-4 font-bold" style={{ color: '#B8860B' }}>

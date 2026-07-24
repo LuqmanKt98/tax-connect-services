@@ -14,6 +14,7 @@ import {
   ClipboardList,
   FolderOpen,
   Shield,
+  UserPlus,
 } from 'lucide-react';
 
 interface Tool {
@@ -37,6 +38,7 @@ const TOOLS: Tool[] = [
   { label: 'Admin Management', description: 'Add admins & change password', to: '/admin/admins', icon: Shield },
   { label: 'Platform fees', description: 'Commission split %', to: '/admin/platform-fees', icon: Percent },
   { label: 'Enrollments', description: 'Application submissions', to: '/admin/enrollments', icon: ClipboardList },
+  { label: 'Free listings', description: 'Agreement-stage leads to follow up', to: '/admin/free-listings', icon: UserPlus },
   { label: 'Signed agreements', description: 'E-signed onboarding docs', to: '/admin/signed-agreements', icon: FileSignature },
   { label: 'Landing analytics', description: 'Funnel & conversion data', to: '/admin/landing-analytics', icon: BarChart3 },
   { label: 'Notifications', description: 'Admin alerts feed', to: '/admin/notifications', icon: Bell },

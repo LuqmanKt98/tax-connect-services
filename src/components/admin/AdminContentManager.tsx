@@ -30,6 +30,7 @@ import {
   Eye,
   EyeOff,
   Users as UsersIcon,
+  Folder,
 } from 'lucide-react';
 import {
   listAllContent,
@@ -47,6 +48,7 @@ import {
 
 const TYPE_OPTIONS: { value: ContentType; label: string }[] = [
   { value: 'file', label: 'File upload' },
+  { value: 'folder', label: 'Folder (multiple files)' },
   { value: 'link', label: 'External link' },
   { value: 'video', label: 'Video URL' },
 ];
@@ -69,6 +71,7 @@ const AdminContentManager: React.FC = () => {
   const [type, setType] = useState<ContentType>('file');
   const [url, setUrl] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [folderFiles, setFolderFiles] = useState<File[]>([]);
   const [published, setPublished] = useState(true);
 
   const load = async () => {
@@ -91,6 +94,7 @@ const AdminContentManager: React.FC = () => {
     setType('file');
     setUrl('');
     setFile(null);
+    setFolderFiles([]);
     setPublished(true);
   };
 
@@ -104,8 +108,9 @@ const AdminContentManager: React.FC = () => {
     if (!title.trim()) return false;
     if (categories.length === 0) return false;
     if (type === 'file') return !!file;
+    if (type === 'folder') return folderFiles.length > 0;
     return !!url.trim();
-  }, [title, categories, type, file, url]);
+  }, [title, categories, type, file, folderFiles, url]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,8 +122,9 @@ const AdminContentManager: React.FC = () => {
         description,
         categories,
         type,
-        url: type === 'file' ? undefined : url,
+        url: type === 'file' || type === 'folder' ? undefined : url,
         file: type === 'file' ? file : null,
+        files: type === 'folder' ? folderFiles : null,
         is_published: published,
         created_by: user?.uid ?? null,
       });
@@ -238,6 +244,7 @@ const AdminContentManager: React.FC = () => {
                 onChange={(e) => {
                   setType(e.target.value as ContentType);
                   setFile(null);
+                  setFolderFiles([]);
                   setUrl('');
                 }}
                 className={`${selectClass} mt-1.5`}
@@ -263,6 +270,32 @@ const AdminContentManager: React.FC = () => {
                   <p className="mt-1 text-xs text-slate-500">
                     {file.name} · {(file.size / 1024 / 1024).toFixed(2)} MB
                   </p>
+                )}
+              </div>
+            ) : type === 'folder' ? (
+              <div>
+                <Label htmlFor="content-folder">Folder files *</Label>
+                <Input
+                  id="content-folder"
+                  type="file"
+                  multiple
+                  onChange={(e) => setFolderFiles(Array.from(e.target.files || []))}
+                  className="mt-1.5"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  Select every file that belongs in this folder — hold Ctrl/Cmd to pick multiple.
+                </p>
+                {folderFiles.length > 0 && (
+                  <ul className="mt-2 max-h-32 space-y-1 overflow-y-auto rounded-md border border-slate-200 p-2 text-xs text-slate-600">
+                    {folderFiles.map((f, i) => (
+                      <li key={`${f.name}-${i}`} className="flex items-center justify-between gap-2">
+                        <span className="truncate">{f.name}</span>
+                        <span className="flex-shrink-0 text-slate-400">
+                          {(f.size / 1024 / 1024).toFixed(2)} MB
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </div>
             ) : (
@@ -330,7 +363,7 @@ const AdminContentManager: React.FC = () => {
             <div className="divide-y divide-slate-100">
               {items.map((c) => {
                 const TypeIcon =
-                  c.type === 'video' ? PlayCircle : c.type === 'link' ? LinkIcon : FileText;
+                  c.type === 'video' ? PlayCircle : c.type === 'link' ? LinkIcon : c.type === 'folder' ? Folder : FileText;
                 return (
                   <div key={c.id} className="flex items-start justify-between gap-3 py-3">
                     <div className="flex min-w-0 gap-3">
@@ -358,15 +391,21 @@ const AdminContentManager: React.FC = () => {
                               </Badge>
                             ))
                           )}
-                          {c.url && (
-                            <a
-                              href={c.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:underline"
-                            >
-                              preview
-                            </a>
+                          {c.type === 'folder' ? (
+                            <span className="text-slate-500">
+                              {c.files?.length || 0} file{c.files?.length === 1 ? '' : 's'}
+                            </span>
+                          ) : (
+                            c.url && (
+                              <a
+                                href={c.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline"
+                              >
+                                preview
+                              </a>
+                            )
                           )}
                         </div>
                       </div>

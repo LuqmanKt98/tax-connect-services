@@ -11,6 +11,7 @@ import {
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
+import { notifyAdmin } from '@/services/emailNotificationService';
 
 export interface ContactSubmission {
   id?: string;
@@ -64,6 +65,35 @@ export const submitContactForm = async (
   };
 
   const result = await addDoc(collection(db, 'contact_submissions'), payload);
+
+  // Notify admin by email — previously this only wrote a Firestore doc, so
+  // submissions silently piled up in /admin/contact-submissions with nobody
+  // alerted. Non-blocking: an email failure must never fail the submission
+  // itself (the doc above is already saved).
+  try {
+    await notifyAdmin({
+      subject:
+        data.form_type === 'professional_contact'
+          ? `New message for ${data.professional_name || 'a professional'} from ${data.name}`
+          : `New contact form submission from ${data.name}`,
+      intro: data.message,
+      rows: [
+        { label: 'Name', value: data.name },
+        { label: 'Email', value: data.email },
+        ...(data.phone ? [{ label: 'Phone', value: data.phone }] : []),
+        ...(data.subject ? [{ label: 'Subject', value: data.subject }] : []),
+        ...(data.service_type ? [{ label: 'Service', value: data.service_type }] : []),
+        ...(data.professional_name
+          ? [{ label: 'Regarding professional', value: data.professional_name }]
+          : []),
+      ],
+      category: 'contact_submission',
+      meta: { submissionId: result.id, formType: data.form_type },
+    });
+  } catch (err) {
+    console.warn('Failed to send contact-submission admin notification:', err);
+  }
+
   return { id: result.id };
 };
 
